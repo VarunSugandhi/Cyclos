@@ -2,11 +2,11 @@ import { useRef, useEffect, useState } from 'react';
 import './LocalFactsCarousel.css';
 
 const GET_FACTS = (loc) => [
-  { img: 'https://images.unsplash.com/photo-1618477461853-cf6ed80fca73?w=200&q=80', title: `${loc} Coastal Cleanup`, body: `Recent data shows ${loc} has recovered over 2,500 lbs of ocean-bound plastic this year alone.`, color: '#0ea5e9' },
-  { img: 'https://images.unsplash.com/photo-1589255734268-c135aa6b27da?w=200&q=80', title: `Microplastics Alert`, body: `Samples in the ${loc} district reveal 30% less microplastics than the national average! Great work.`, color: '#0369a1' },
-  { img: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=200&q=80', title: `Coral Restoration`, body: `New ${loc} marine initiatives are replanting 500+ coral fragments to restore the local reef ecosystem.`, color: '#0284c7' },
-  { img: 'https://images.unsplash.com/photo-1583212292454-1fe6229603b7?w=200&q=80', title: `Ghost Net Recovery`, body: `Local divers in ${loc} successfully removed 4 major commercial fishing nets, saving countless sea turtles.`, color: '#0284c7' },
-  { img: 'https://images.unsplash.com/photo-1533560904424-a0c61dc306fc?w=200&q=80', title: 'Wildlife Sightings', body: `Proper waste sorting directly impacts the marine cleanliness of ${loc}, leading to increased dolphin sightings!`, color: '#38bdf8' }
+  { img: 'https://loremflickr.com/400/300/beach,plastic,cleanup/all', title: `${loc} Coastal Cleanup`, body: `Recent data shows ${loc} has recovered over 2,500 lbs of ocean-bound plastic this year alone.`, color: '#0ea5e9' },
+  { img: 'https://loremflickr.com/400/300/microplastic,ocean/all', title: `Microplastics Alert`, body: `Samples in the ${loc} district reveal 30% less microplastics than the national average! Great work.`, color: '#0369a1' },
+  { img: 'https://loremflickr.com/400/300/coral,reef/all', title: `Coral Restoration`, body: `New ${loc} marine initiatives are replanting 500+ coral fragments to restore the local reef ecosystem.`, color: '#0284c7' },
+  { img: 'https://loremflickr.com/400/300/fishing,net,underwater/all', title: `Ghost Net Recovery`, body: `Local divers in ${loc} successfully removed 4 major commercial fishing nets, saving countless sea turtles.`, color: '#0284c7' },
+  { img: 'https://loremflickr.com/400/300/dolphin,ocean/all', title: 'Wildlife Sightings', body: `Proper waste sorting directly impacts the marine cleanliness of ${loc}, leading to increased dolphin sightings!`, color: '#38bdf8' }
 ];
 
 export default function LocalFactsCarousel({ location }) {
@@ -91,9 +91,13 @@ export default function LocalFactsCarousel({ location }) {
         {/* Double the facts for infinite loop effect */}
         {[...facts, ...facts].map((f, i) => (
           <div key={i} className="local-fact-card">
-            <img src={f.img} alt={f.title} className="local-fact-card__img" />
-            <h3 className="local-fact-card__title">{f.title}</h3>
-            <p className="local-fact-card__body">{f.body}</p>
+            <div className="local-fact-card__img-wrap">
+              <img src={f.img} alt={f.title} className="local-fact-card__img" />
+            </div>
+            <div className="local-fact-card__content">
+              <h3 className="local-fact-card__title">{f.title}</h3>
+              <p className="local-fact-card__body">{f.body}</p>
+            </div>
           </div>
         ))}
       </div>
