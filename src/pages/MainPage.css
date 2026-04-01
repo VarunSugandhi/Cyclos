@@ -83,6 +83,28 @@
   transform: scale(1.05);
 }
 
+.notification-wrapper {
+  position: relative;
+  display: flex;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  background: #10b981;
+  color: white;
+  font-size: 10px;
+  font-weight: 800;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #e0f2fe;
+}
+
 /* Stats Row */
 .dash-stats-row {
   display: flex;

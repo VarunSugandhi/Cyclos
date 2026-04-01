@@ -1,30 +1,54 @@
 .bottom-nav-app {
   position: fixed;
-  bottom: 24px;
+  bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
   background: white;
   display: flex;
   align-items: center;
-  padding: 8px 16px;
+  padding: 8px 20px;
   border-radius: 50px;
-  gap: 12px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+  gap: 10px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
   z-index: 9999;
+  /* keep dock inside safe area on iPhone notch / home-bar devices */
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+
+/* ── Clamp width so it never overflows narrow screens ── */
+@media (max-width: 480px) {
+  .bottom-nav-app {
+    /* cap to viewport minus 24px per side */
+    max-width: calc(100vw - 32px);
+    gap: 6px;
+    padding: 6px 14px;
+    padding-bottom: max(6px, env(safe-area-inset-bottom));
+    bottom: 14px;
+  }
 }
 
 .bottom-nav-app__item {
-  width: 48px;
-  height: 48px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
+  font-size: 22px;
   color: #110e1b;
   transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   cursor: pointer;
   background: transparent;
+  flex-shrink: 0;
+}
+
+/* shrink icon circles on very small screens */
+@media (max-width: 380px) {
+  .bottom-nav-app__item {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+  }
 }
 
 .bottom-nav-app__item svg {

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { TbEdit, TbBell, TbLeaf, TbRipple, TbRecycle, TbBottle, TbAnchor, TbDroplet, TbMessageReport } from 'react-icons/tb';
+import NotificationsPanel from '../components/NotificationsPanel';
+import ProfilePanel from '../components/ProfilePanel';
 
 /* Secondary domain materials — icon + color mapping */
 const SECONDARY_MATERIALS = [
@@ -19,6 +21,50 @@ import './MainPage.css';
 export default function MainPage() {
   const { user, userProfile } = useAuth();
   const navigate = useNavigate();
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showProfilePanel, setShowProfilePanel] = useState(false);
+
+  const mockNotifications = [
+    {
+      id: 1,
+      type: 'buy_request',
+      message: 'New buy request received.',
+      subtext: 'A buyer wants to purchase recycled plastic from your listing.',
+      timestamp: '10 minutes ago',
+      read: false,
+      buttons: [
+        { label: 'View Request', style: 'secondary' },
+        { label: 'Accept', style: 'primary' },
+        { label: 'Decline', style: 'danger' }
+      ]
+    },
+    {
+      id: 2,
+      type: 'pickup',
+      message: 'Recycler confirmed pickup for your recyclable waste.',
+      subtext: 'Scheduled pickup: Tomorrow at 10:00 AM.',
+      timestamp: '2 hours ago',
+      read: false,
+      buttons: [
+        { label: 'View Details', style: 'secondary' },
+        { label: 'Track Pickup', style: 'primary' }
+      ]
+    },
+    {
+      id: 3,
+      type: 'event',
+      message: 'New coastal cleanup event added near Bengaluru.',
+      subtext: '',
+      timestamp: '1 day ago',
+      read: true,
+      buttons: [
+        { label: 'View Event', style: 'secondary' },
+        { label: 'Join Event', style: 'primary' }
+      ]
+    }
+  ];
+
+  const unreadCount = mockNotifications.filter(n => !n.read).length;
 
   const firstName = user?.name?.split(' ')[0] || 'Leonard';
   const fullName = user?.name || 'Leonard N. Olson';
@@ -46,10 +92,22 @@ export default function MainPage() {
             <button className="dash-profile-edit" aria-label="Complaints" onClick={() => navigate('/complaint')}>
               <TbMessageReport size={16} />
             </button>
-            <button className="dash-profile-edit" aria-label="Notifications" onClick={() => navigate('/notifications')}>
-              <TbBell size={16} />
-            </button>
-            <button className="dash-profile-edit" aria-label="Dashboard" onClick={() => navigate('/dashboard')}>
+            <div className="notification-wrapper">
+              <button 
+                className="dash-profile-edit" 
+                aria-label="Notifications" 
+                onClick={() => setShowNotifications(!showNotifications)}
+              >
+                <TbBell size={16} />
+                {unreadCount > 0 && <span className="notification-badge">{unreadCount}</span>}
+              </button>
+              <NotificationsPanel 
+                isOpen={showNotifications} 
+                onClose={() => setShowNotifications(false)} 
+                notifications={mockNotifications} 
+              />
+            </div>
+            <button className="dash-profile-edit" aria-label="Dashboard" onClick={() => setShowProfilePanel(!showProfilePanel)}>
               <TbEdit size={16} />
             </button>
           </div>
@@ -74,6 +132,11 @@ export default function MainPage() {
           </div>
         </div>
       </motion.div>
+
+      <ProfilePanel 
+        isOpen={showProfilePanel} 
+        onClose={() => setShowProfilePanel(false)} 
+      />
 
       <div className="dash-content">
         {/* Map Section */}
