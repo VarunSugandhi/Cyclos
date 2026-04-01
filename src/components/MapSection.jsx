@@ -6,33 +6,33 @@ import { TbSparkles, TbLoader2, TbX } from 'react-icons/tb';
 import { getChatResponse } from '../services/nvidiaNim';
 import './MapSection.css';
 
-// 20 fuzzy sample points around Bangalore
-const BASE_LAT = 12.9716;
-const BASE_LNG = 77.5946;
+// Ocean center (Indian Ocean)
+const BASE_LAT = -8.0;
+const BASE_LNG = 75.0;
 
-function generatePoints(count = 20) {
+function generatePoints(count = 60) {
   return Array.from({ length: count }, (_, i) => ({
     id: i,
-    lat: BASE_LAT + (Math.random() - 0.5) * 0.25,
-    lng: BASE_LNG + (Math.random() - 0.5) * 0.25,
+    // Spread widely across the ocean
+    lat: BASE_LAT + (Math.random() - 0.5) * 40,
+    lng: BASE_LNG + (Math.random() - 0.5) * 60,
     title: [
-      'Coastal Zone A', 'Bay Cleanup Area', 'Deep Reef',
-      'Harbor Port', 'Estuary Outlet', 'Marine Reserve',
-      'Industrial Coast', 'Public Beach', 'Island Cove',
-      'Fishing Community', 'Coral Atoll', 'Open Water Zone'
-    ][i % 12],
-    kg: Math.floor(Math.random() * 500 + 50),
-    type: ['Populated', 'Polluted', 'Less Explored'][Math.floor(Math.random() * 3)],
-    distance: (Math.random() * 15 + 0.5).toFixed(1),
+      'Great Garbage Patch', 'Ocean Gyre Center', 'Shipping Lane Debris',
+      'Subtropical Convergence', 'Deep Ocean Trench', 'Remote Atoll Coast',
+      'Equatorial Current', 'Microplastic Hotspot', 'Reef Buffer Zone'
+    ][Math.floor(Math.random() * 9)],
+    kg: Math.floor(Math.random() * 5000 + 500),
+    type: ['Most Polluted', 'High Traffic', 'Remote/Less Explored'][Math.floor(Math.random() * 3)],
+    distance: (Math.random() * 2000 + 100).toFixed(0),
   }));
 }
 
-const POINTS = generatePoints(20);
+const POINTS = generatePoints(60);
 
 const COLOR_MAP = {
-  Populated: '#38bdf8', /* Cyan */
-  Polluted: '#ef4444', /* Red */
-  'Less Explored': '#10b981', /* Teal/Green */
+  'Most Polluted': '#ef4444', /* Red */
+  'High Traffic': '#f59e0b', /* Orange */
+  'Remote/Less Explored': '#38bdf8', /* Cyan */
 };
 
 function DarkMap() {
@@ -86,7 +86,7 @@ export default function MapSection({ domain }) {
       <div className="map-container">
         <MapContainer
           center={[BASE_LAT, BASE_LNG]}
-          zoom={12}
+          zoom={4}
           style={{ height: '100%', width: '100%', borderRadius: '16px' }}
           zoomControl={false}
           attributionControl={false}
@@ -100,12 +100,12 @@ export default function MapSection({ domain }) {
             <CircleMarker
               key={p.id}
               center={[p.lat, p.lng]}
-              radius={8 + Math.random() * 6}
+              radius={8 + (p.kg / 5000) * 15} // Make radius depend on weight for a heat map feel
               pathOptions={{
                 color: COLOR_MAP[p.type],
                 fillColor: COLOR_MAP[p.type],
-                fillOpacity: 0.6,
-                weight: 1.5,
+                fillOpacity: 0.5,
+                weight: 0,
                 opacity: 0.8,
               }}
             >

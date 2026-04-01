@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { TbLeaf, TbMail, TbLock, TbEye, TbEyeOff, TbArrowLeft } from 'react-icons/tb';
 import { FcGoogle } from 'react-icons/fc';
 import { FaFacebookF, FaApple } from 'react-icons/fa';
+import { supabase } from '../supabase/supabaseClient';
 import './AuthPage.css';
 
 export default function LoginPage() {
@@ -33,12 +34,12 @@ export default function LoginPage() {
     }
   };
 
-  const handleSocial = async () => {
+  const handleSocial = async (provider) => {
     try {
       setLoading(true);
       setError('');
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+        provider: provider,
         options: {
           redirectTo: window.location.origin + '/app'
         }
@@ -122,13 +123,13 @@ export default function LoginPage() {
         <div className="auth-divider">Or sign in with</div>
 
         <div className="auth-social-row">
-          <button className="auth-social-btn auth-social-btn--google" onClick={handleSocial} aria-label="Continue with Google">
+          <button type="button" className="auth-social-btn auth-social-btn--google" onClick={() => handleSocial('google')} aria-label="Continue with Google">
             <FcGoogle size={20} />
           </button>
-          <button className="auth-social-btn auth-social-btn--facebook" onClick={handleSocial} aria-label="Continue with Facebook">
+          <button type="button" className="auth-social-btn auth-social-btn--facebook" onClick={() => handleSocial('facebook')} aria-label="Continue with Facebook">
             <FaFacebookF size={18} />
           </button>
-          <button className="auth-social-btn auth-social-btn--apple" onClick={handleSocial} aria-label="Continue with Apple">
+          <button type="button" className="auth-social-btn auth-social-btn--apple" onClick={() => handleSocial('apple')} aria-label="Continue with Apple">
             <FaApple size={20} />
           </button>
         </div>
