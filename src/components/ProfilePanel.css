@@ -13,7 +13,7 @@
   position: absolute;
   top: 24px;
   right: 24px;
-  bottom: 24px;
+  bottom: 100px;   /* clears the fixed quick-nav (~82px tall + 20px gap) */
   width: 380px;
   background: #ffffff;
   border-radius: 20px;
@@ -28,7 +28,7 @@
   .profile-panel {
     top: 16px;
     right: 16px;
-    bottom: 16px;
+    bottom: 96px;   /* clears quick-nav on mobile */
     width: calc(100% - 32px);
   }
 }
