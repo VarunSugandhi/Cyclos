@@ -24,7 +24,7 @@ Cyclos is a React-based web application built to support sustainable practices t
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/Abhishekjain19/Cyclos.git
+   git clone https://github.com/VarunSugandhi/Cyclos.git
    cd Cyclos
    npm i
    npm run dev
