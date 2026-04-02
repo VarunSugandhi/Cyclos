@@ -35,7 +35,7 @@ export default function ProfilePanel({ isOpen, onClose }) {
   const fetchAcceptedRequests = async () => {
     try {
       const { data, error } = await supabase
-        .from('buy_requests')
+        .from('market_orders')
         .select('*')
         .eq('seller_id', user.id)
         .eq('status', 'accepted');

@@ -270,7 +270,7 @@ export default function MarketPage() {
         // Don't insert for seed products
         const isSeed = String(selected.id).startsWith('seed');
         if (!isSeed) {
-          const { error } = await supabase.from('buy_requests').insert({
+          const { error } = await supabase.from('market_orders').insert({
             product_id: selected.id,
             buyer_id: user.id,
             seller_id: selected.seller_id,
