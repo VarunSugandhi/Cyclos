@@ -76,7 +76,7 @@ Clone the repository and install the Vite application dependencies:
 
 ```bash
 git clone https://github.com/AdvayaBGSCET/team-nether-watchers.git
-cd Cyclos
+cd team-nether-watchers
 npm install
 ```
 
