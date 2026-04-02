@@ -211,6 +211,12 @@ export default function ProfilePanel({ isOpen, onClose }) {
                   )}
                   <p className="profile-role">Sustainability Champion</p>
                 </div>
+                <button 
+                  onClick={() => { fetchAcceptedRequests(); fetchPendingPurchases(); fetchUserEvents(); }}
+                  style={{ marginTop: '12px', padding: '6px 12px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid var(--teal-300)', color: 'var(--teal-300)', borderRadius: '20px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                >
+                  Refresh Orders
+                </button>
               </div>
 
               {/* Section 2: User Contribution Stats */}
@@ -273,82 +279,94 @@ export default function ProfilePanel({ isOpen, onClose }) {
                 </div>
               </div>
 
-              {/* Section: My Purchases (Buyer) */}
-              {pendingPurchases.length > 0 && (
-                <div className="panel-section">
-                  <h4 className="section-title">My Purchases</h4>
-                  <div className="active-events-list">
-                    {pendingPurchases.map(req => (
-                      <div 
-                        key={req.id} 
-                        className="user-event-card" 
-                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', cursor: 'pointer' }}
-                        onClick={() => setSelectedQR(selectedQR === req.id ? null : req.id)}
-                      >
-                        <div className="user-event-card__info" style={{ width: '100%' }}>
-                          <h5 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 4px 0' }}>
-                            {req.product_name}
-                            <TbQrcode size={18} style={{ color: 'var(--teal-300)' }} />
-                          </h5>
-                          <span style={{ fontSize: '11px', color: 'var(--teal-300)', display: 'block' }}>Seller: {req.seller_name}</span>
-                          <span style={{ fontSize: '11px', display: 'block', marginTop: 2 }}>Date: {req.pickup_date || 'TBD'}</span>
-                        </div>
-                        {selectedQR === req.id && (
-                          <div style={{ marginTop: 12, padding: 12, background: 'white', borderRadius: 8, alignSelf: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
-                            <QRCode value={`REQ-${req.id}-${req.buyer_id}`} size={120} />
-                            <p style={{ textAlign: 'center', color: '#000', fontSize: 10, marginTop: 6, marginBottom: 0, fontWeight: 600 }}>Show to Seller to Scan</p>
+              <div className="panel-section">
+                <h4 className="section-title">Transactions & Orders</h4>
+                
+                <div className="orders-container">
+                  {/* Buyer View: Show QR Codes for Accepted Items */}
+                  {pendingPurchases.length > 0 ? (
+                    <div style={{ marginBottom: '24px' }}>
+                      <h5 style={{ fontSize: '12px', color: 'var(--teal-300)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <TbQrcode /> My Purchases (Accepted)
+                      </h5>
+                      <div className="active-events-list">
+                        {pendingPurchases.map(req => (
+                          <div 
+                            key={req.id} 
+                            className="user-event-card" 
+                            style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', cursor: 'pointer', border: selectedQR === req.id ? '1px solid var(--teal-300)' : '1px solid #e2e8f0' }}
+                            onClick={() => setSelectedQR(selectedQR === req.id ? null : req.id)}
+                          >
+                            <div className="user-event-card__info" style={{ width: '100%' }}>
+                              <h5 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 4px 0' }}>
+                                {req.product_name}
+                                <TbQrcode size={18} style={{ color: selectedQR === req.id ? 'var(--teal-500)' : 'var(--teal-300)' }} />
+                              </h5>
+                              <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>Seller: {req.seller_name}</span>
+                            </div>
+                            {selectedQR === req.id && (
+                              <motion.div 
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                style={{ marginTop: 16, padding: 16, background: 'white', borderRadius: 12, alignSelf: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}
+                              >
+                                <QRCode value={`REQ-${req.id}-${req.buyer_id}`} size={140} />
+                                <p style={{ textAlign: 'center', color: '#1e293b', fontSize: 10, marginTop: 8, fontWeight: 700 }}>
+                                  SCAN TO COMPLETE PICKUP
+                                </p>
+                              </motion.div>
+                            )}
                           </div>
-                        )}
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                    </div>
+                  ) : null}
 
-              {/* Section: Pending Pickups (Seller) */}
-              {acceptedRequests.length > 0 && (
-                <div className="panel-section">
-                  <h4 className="section-title">Pending Pickups</h4>
-                  <div className="active-events-list">
-                    {acceptedRequests.map(req => (
-                      <div 
-                        key={req.id} 
-                        className="user-event-card" 
-                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
-                      >
-                        <div className="user-event-card__info" style={{ width: '100%' }}>
-                          <h5 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 4px 0' }}>
-                            {req.product_name}
-                            <TbQrcode size={18} style={{ opacity: 0.4 }} />
-                          </h5>
-                          <span style={{ fontSize: '11px', color: 'var(--teal-300)', display: 'block' }}>Buyer: {req.buyer_name}</span>
-                          <span style={{ fontSize: '11px', display: 'block', marginTop: 2 }}>Status: Awaiting Scan</span>
-                        </div>
+                  {/* Seller View: Show Scan Button for Accepted Orders */}
+                  {acceptedRequests.length > 0 ? (
+                    <div>
+                      <h5 style={{ fontSize: '12px', color: 'var(--teal-300)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <TbCameraPlus /> Pending Pickups (Seller)
+                      </h5>
+                      <div className="active-events-list">
+                        {acceptedRequests.map(req => (
+                          <div key={req.id} className="user-event-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                            <div className="user-event-card__info" style={{ width: '100%' }}>
+                              <h5>{req.product_name}</h5>
+                              <span style={{ fontSize: '11px', color: '#64748b' }}>Buyer: {req.buyer_name}</span>
+                            </div>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); navigate('/scan'); onClose(); }}
+                              style={{ marginTop: '10px', width: '100%', padding: '8px', background: 'var(--teal-500)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                            >
+                              Open Scanner to Verify
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                    </div>
+                  ) : null}
 
-              {/* Section 3: Marketplace Activity */}
+                  {(pendingPurchases.length === 0 && acceptedRequests.length === 0) && (
+                    <div style={{ textAlign: 'center', padding: '20px 0', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                      <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>No active pickups/purchases found.</p>
+                      <p style={{ margin: '4px 0 0', fontSize: '10px', color: '#cbd5e1' }}>Only accepted requests with QR codes will appear here.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Section 4: History/General Activity */}
               <div className="panel-section">
                 <h4 className="section-title">Marketplace Activity</h4>
                 <div className="activity-list">
                   {marketplaceActivity.length === 0 ? (
-                    <p className="empty-text">No marketplace activity yet.</p>
+                    <p className="empty-text">No marketplace history yet.</p>
                   ) : (
                     marketplaceActivity.map((item) => (
                       <div key={item.id} className="activity-card">
-                        <div className="activity-card__header">
-                          <span className={`activity-type badge-${item.color}`}>{item.action}</span>
-                          <span className={`activity-status ${getStatusClass(item.status)}`}>{item.status}</span>
-                        </div>
                         <h5 className="activity-name">{item.name}</h5>
-                        <div className="activity-meta">
-                          <span>Qty: {item.qty}</span>
-                          <span className="activity-dot">•</span>
-                          <span>{item.date}</span>
-                        </div>
+                        <p className="activity-meta">{item.date} • {item.action}</p>
                       </div>
                     ))
                   )}
@@ -356,7 +374,6 @@ export default function ProfilePanel({ isOpen, onClose }) {
               </div>
             </div>
 
-            {/* Section 4: Account Action */}
             <div className="profile-panel__footer">
               <button className="btn-logout" onClick={handleLogout}>
                 <TbLogout size={18} />
