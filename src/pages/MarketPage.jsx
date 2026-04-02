@@ -277,7 +277,6 @@ export default function MarketPage() {
             buyer_name: userProfile?.full_name || user.email,
             product_name: getDisplayName(selected),
             status: 'pending',
-            message: `Buy request for ${getDisplayName(selected)} (${selected.quantity || 'any quantity'}) at ${selected.price || 'negotiable'}`,
             pickup_date: pickupDate || 'Not specified',
           });
           if (error) throw error;

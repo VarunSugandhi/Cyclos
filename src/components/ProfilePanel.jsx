@@ -263,26 +263,25 @@ export default function ProfilePanel({ isOpen, onClose }) {
                   <h4 className="section-title">Pending Pickups</h4>
                   <div className="active-events-list">
                     {acceptedRequests.map(req => (
-                      <div key={req.id} className="user-event-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                      <div 
+                        key={req.id} 
+                        className="user-event-card" 
+                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', cursor: 'pointer' }}
+                        onClick={() => setSelectedQR(selectedQR === req.id ? null : req.id)}
+                      >
                         <div className="user-event-card__info" style={{ width: '100%' }}>
-                          <h5>{req.product_name}</h5>
-                          <span style={{ fontSize: '11px', color: 'var(--teal-300)' }}>Buyer: {req.buyer_name}</span>
-                          <span style={{ fontSize: '11px' }}>Date: {req.pickup_date || 'TBD'}</span>
+                          <h5 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 4px 0' }}>
+                            {req.product_name}
+                            <TbQrcode size={18} style={{ color: 'var(--teal-300)' }} />
+                          </h5>
+                          <span style={{ fontSize: '11px', color: 'var(--teal-300)', display: 'block' }}>Buyer: {req.buyer_name}</span>
+                          <span style={{ fontSize: '11px', display: 'block', marginTop: 2 }}>Date: {req.pickup_date || 'TBD'}</span>
                         </div>
-                        {selectedQR === req.id ? (
-                          <div style={{ marginTop: 12, padding: 12, background: 'white', borderRadius: 8, alignSelf: 'center' }}>
+                        {selectedQR === req.id && (
+                          <div style={{ marginTop: 12, padding: 12, background: 'white', borderRadius: 8, alignSelf: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
                             <QRCode value={`REQ-${req.id}-${req.buyer_id}`} size={120} />
-                            <p style={{ textAlign: 'center', color: '#000', fontSize: 10, marginTop: 6, marginBottom: 0 }}>Show to Buyer</p>
-                            <button className="btn-deactivate" style={{ marginTop: 10, width: '100%', background: 'rgb(241 11 11 / 15%)', color: 'red' }} onClick={() => setSelectedQR(null)}>Hide</button>
+                            <p style={{ textAlign: 'center', color: '#000', fontSize: 10, marginTop: 6, marginBottom: 0, fontWeight: 600 }}>Show to Buyer to Scan</p>
                           </div>
-                        ) : (
-                          <button 
-                            className="btn-deactivate" 
-                            style={{ background: 'var(--teal-300)', color: 'var(--ocean-900)', marginTop: 8 }}
-                            onClick={() => setSelectedQR(req.id)}
-                          >
-                            <TbQrcode size={16} /> Show QR Code
-                          </button>
                         )}
                       </div>
                     ))}
