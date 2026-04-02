@@ -48,12 +48,13 @@ export default function ScanPage() {
       console.log('Fetching order with ID:', realId);
       const cleanId = realId.trim();
       
-      const { data: request, error: fetchErr } = await supabase
+      const { data: orderData, error: fetchErr } = await supabase
         .from('market_orders')
         .select('*')
-        .eq('id', cleanId)
-        .single();
+        .eq('id', cleanId);
         
+      const request = orderData?.[0];
+
       if (fetchErr) {
         console.error('Fetch Error Detail:', fetchErr);
         throw new Error(`DB Error: ${fetchErr.message}`);
