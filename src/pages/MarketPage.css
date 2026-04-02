@@ -484,7 +484,7 @@
   position: fixed;
   inset: 0;
   background: linear-gradient(180deg, rgba(8, 28, 42, 1) 0%, rgba(14, 36, 37, 1) 100%);
-  z-index: 400;
+  z-index: 10000;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -706,7 +706,7 @@
   position: fixed;
   inset: 0;
   background: linear-gradient(180deg, rgba(8, 28, 42, 1) 0%, rgba(14, 36, 37, 1) 100%);
-  z-index: 300;
+  z-index: 10000;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -929,7 +929,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  z-index: 310;
+  z-index: 10001;
 }
 
 .mkt-detail__view-btn {
