@@ -90,10 +90,96 @@ export default function MainPage() {
     }
   }, [userProfile]);
 
-  const handleNotificationAction = (notif, btn) => {
+  // ── Real-time buy request notifications for sellers ──────
+  useEffect(() => {
+    if (!user) return;
+
+    // Fetch any existing pending buy requests for the current seller
+    const fetchPendingBuyRequests = async () => {
+      try {
+        const { data } = await supabase
+          .from('buy_requests')
+          .select('*')
+          .eq('seller_id', user.id)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        if (data && data.length > 0) {
+          const buyNotifs = data.map(req => ({
+            id: `buy-${req.id}`,
+            type: 'buy_request',
+            message: 'New buy request received for your recyclable listing.',
+            subtext: `${req.buyer_name || 'A buyer'} wants to purchase ${req.product_name || 'your item'}.`,
+            timestamp: new Date(req.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            read: false,
+            buttons: [
+              { label: 'View Request', style: 'secondary' },
+              { label: 'Accept', style: 'primary' }
+            ]
+          }));
+          setNotifications(prev => {
+            // Only add new ones not already in state
+            const existingIds = new Set(prev.map(n => n.id));
+            const fresh = buyNotifs.filter(n => !existingIds.has(n.id));
+            return fresh.length > 0 ? [...fresh, ...prev] : prev;
+          });
+        }
+      } catch (err) {
+        // Buy requests table may not exist yet — silently ignore
+        console.debug('Buy requests fetch skipped:', err.message);
+      }
+    };
+
+    fetchPendingBuyRequests();
+
+    // Subscribe to new buy requests where user is the seller
+    const buyChannel = supabase
+      .channel('dashboard:buy-requests')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'buy_requests',
+        filter: `seller_id=eq.${user.id}`,
+      }, (payload) => {
+        const req = payload.new;
+        const newNotif = {
+          id: `buy-${req.id}`,
+          type: 'buy_request',
+          message: 'New buy request received for your recyclable listing.',
+          subtext: `${req.buyer_name || 'A buyer'} wants to purchase ${req.product_name || 'your item'}.`,
+          timestamp: 'Just now',
+          read: false,
+          buttons: [
+            { label: 'View Request', style: 'secondary' },
+            { label: 'Accept', style: 'primary' }
+          ]
+        };
+        setNotifications(prev => [newNotif, ...prev]);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(buyChannel); };
+  }, [user]);
+
+  const handleNotificationAction = async (notif, btn) => {
     if (btn.action === 'view_event' || notif.type === 'event') {
       navigate('/community', { state: { focusEventId: notif.eventId } });
       setShowNotifications(false);
+    }
+    
+    if (notif.type === 'buy_request' && btn.label === 'Accept') {
+      const realId = notif.id.replace('buy-', '');
+      try {
+        await supabase.from('buy_requests').update({ status: 'accepted' }).eq('id', realId);
+        // Remove from notifications
+        setNotifications(prev => prev.filter(n => n.id !== notif.id));
+        // Show profile panel so they can see QR
+        setShowNotifications(false);
+        setShowProfilePanel(true);
+      } catch (err) {
+        console.error('Error accepting buy request:', err);
+      }
     }
   };
 

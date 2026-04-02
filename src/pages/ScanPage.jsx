@@ -1,12 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TbArrowLeft, TbReload, TbCamera, TbPhoto } from 'react-icons/tb';
+import { TbArrowLeft, TbReload, TbCamera, TbPhoto, TbQrcode } from 'react-icons/tb';
 import { analyzeWasteImage } from '../services/nvidiaNim';
+import { supabase } from '../supabase/supabaseClient';
+import { useAuth } from '../context/AuthContext';
+import { toast } from 'react-hot-toast';
+import { Scanner } from '@yudiel/react-qr-scanner';
 import './ScanPage.css';
 
 export default function ScanPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   
@@ -17,8 +22,52 @@ export default function ScanPage() {
   const [error, setError] = useState(null);
   const [useCamera, setUseCamera] = useState(false);
   const [autoScan, setAutoScan] = useState(true);
-  const [inputMode, setInputMode] = useState('choose'); // 'choose', 'camera', 'upload'
+  const [inputMode, setInputMode] = useState('choose'); // 'choose', 'camera', 'upload', 'qr'
   const [scanningProgress, setScanningProgress] = useState(0);
+  const [qrMessage, setQrMessage] = useState('');
+
+  const handleQRScan = async (text) => {
+    if (!text || !text.startsWith('REQ-') || analyzing) return;
+    try {
+      setAnalyzing(true);
+      const reqIdParts = text.split('-');
+      if (reqIdParts.length < 3) throw new Error("Invalid QR format");
+      const realId = reqIdParts[1];
+      const buyerId = reqIdParts[2];
+      
+      if (user.id !== buyerId) {
+        throw new Error("This QR doesn't belong to your account.");
+      }
+
+      // Mark request complete
+      const { data: request, error } = await supabase
+        .from('buy_requests')
+        .update({ status: 'completed' })
+        .eq('id', realId)
+        .select('*')
+        .single();
+        
+      if (error) throw error;
+      
+      // Basic logic to award points
+      try {
+        await supabase.from('profiles').update({ points: 50, total_recycled_weight: 10 }).eq('id', user.id); 
+        await supabase.from('profiles').update({ points: 50, total_recycled_weight: 10 }).eq('id', request.seller_id);
+      } catch (e) {
+        console.error('Points increment failed, but transaction completed', e);
+      }
+      
+      setQrMessage('Transaction successfully completed!');
+      toast.success('Pick-up verified! Points awarded to both users.');
+      setScanned(true);
+      setResult({ type: 'Purchase Verified', weight_estimation: 'Added 10kg to Profile', recycling_cost: '+50 Points' });
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || 'Failed to verify transaction');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   // Helper for actual analysis to avoid redundant logic
   const captureAndProcess = () => {
@@ -195,7 +244,17 @@ export default function ScanPage() {
                   }}
                 >
                   <TbCamera size={32} />
-                  <span>LIVE CAMERA</span>
+                  <span>AI WASTE SCAN</span>
+                </button>
+                <button 
+                  className="scan-choice-btn"
+                  style={{ background: 'var(--ocean-800)', marginTop: 12, border: '1px solid var(--ocean-600)' }}
+                  onClick={() => {
+                    setInputMode('qr');
+                  }}
+                >
+                  <TbQrcode size={32} />
+                  <span>TRANSACT (QR)</span>
                 </button>
                 <div className="scan-choice-divider">OR</div>
                 <label className="scan-choice-btn upload">
@@ -206,6 +265,15 @@ export default function ScanPage() {
                   <TbPhoto size={32} />
                   <span>UPLOAD PHOTO</span>
                 </label>
+              </div>
+            ) : inputMode === 'qr' ? (
+              <div style={{ width: '100%', height: '100%', background: 'black', position: 'relative' }}>
+                <Scanner onScan={(res) => handleQRScan(res?.[0]?.rawValue)} />
+                {qrMessage && (
+                  <div style={{ position: 'absolute', bottom: 20, left: 10, right: 10, background: 'var(--teal-400)', color: 'var(--ocean-900)', padding: 10, borderRadius: 8, textAlign: 'center', fontWeight: 'bold' }}>
+                    {qrMessage}
+                  </div>
+                )}
               </div>
             ) : inputMode === 'camera' ? (
               <video 

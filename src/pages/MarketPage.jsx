@@ -1,152 +1,408 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  TbChevronLeft, TbShoppingCart, TbSearch,
-  TbHeart, TbStarFilled, TbChevronRight, TbUpload, TbPhoto, TbCheck, TbMapPin
+  TbChevronLeft, TbShoppingCart, TbSearch, TbHeart, TbStarFilled,
+  TbChevronRight, TbUpload, TbPhoto, TbCheck, TbMapPin, TbX,
+  TbSortAscending, TbFilter, TbUser, TbPackage, TbSend, TbBell,
+  TbAlertCircle, TbLoader2, TbEye, TbRefresh
 } from 'react-icons/tb';
+import { supabase } from '../supabase/supabaseClient';
+import { useAuth } from '../context/AuthContext';
 import './MarketPage.css';
 
 /* ── Category tabs ─────────── */
 const CATEGORIES = [
-  { id: 'all',       emoji: '🌊', label: 'All' },
-  { id: 'ornament',  emoji: '🐚', label: 'Ornaments' },
-  { id: 'obp',       emoji: '♻️', label: 'OBP Plastic' },
-  { id: 'fishing',   emoji: '🕸️', label: 'Nets' },
-  { id: 'metals',    emoji: '🔩', label: 'Sea Metals' },
-  { id: 'glass',     emoji: '🏺', label: 'Sea Glass' },
+  { id: 'all',      emoji: '🌊', label: 'All' },
+  { id: 'plastic',  emoji: '♻️', label: 'Plastic' },
+  { id: 'metal',    emoji: '🔩', label: 'Metal' },
+  { id: 'paper',    emoji: '📄', label: 'Paper' },
+  { id: 'glass',    emoji: '🏺', label: 'Glass' },
+  { id: 'ewaste',   emoji: '💻', label: 'E-waste' },
+  { id: 'organic',  emoji: '🌿', label: 'Organic' },
+  { id: 'ornament', emoji: '🐚', label: 'Ornaments' },
+  { id: 'obp',      emoji: '🌀', label: 'OBP Plastic' },
+  { id: 'fishing',  emoji: '🕸️', label: 'Nets' },
+  { id: 'metals',   emoji: '⚓', label: 'Sea Metals' },
 ];
 
-/* ── Product catalogue ───────────────────────────────── */
-const PRODUCTS = [
-  {
-    id: 1, category: 'ornament',
-    name: 'Ocean-Glass Pendant',
-    desc: 'Hand-crafted pendant made from sea glass recovered near coastal reefs. Polished and wrapped in recycled silver wire.',
-    price: '₹450',
-    img: 'https://images.unsplash.com/photo-1611080277317-0b1e4da2880c?w=400&q=80',
-  },
-  {
-    id: 2, category: 'obp',
-    name: 'OBP Extruded Filament',
-    desc: '3D printing filament (1.75mm) made entirely from Ocean Bound Plastic recovered off the coast. High durability for eco-printing.',
-    price: '₹850/kg',
-    img: 'https://images.unsplash.com/photo-1611284446314-60a58a7dd514?w=400&q=80',
-  },
-  {
-    id: 3, category: 'fishing',
-    name: 'Recycled Ghost Net Bag',
-    desc: 'Durable tote bag woven from abandoned fishing nets (ghost nets) salvaged by deep-sea divers. Water-resistant and extremely tough.',
-    price: '₹600',
-    img: 'https://images.unsplash.com/photo-1597816045474-0402b8d0e74f?w=400&q=80',
-  },
-  {
-    id: 4, category: 'metals',
-    name: 'Recovered Hull Scrap',
-    desc: 'Sorted steel from decommissioned coastal vessels. Cleaned and ready for industrial smelting. 99% iron content.',
-    price: '₹45/kg',
-    img: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=80',
-  },
-  {
-    id: 5, category: 'glass',
-    name: 'Crushed Sea Glass Aggregate',
-    desc: 'Tumbled sea glass mixed for use in decorative terrazzo flooring and coastal landscaping projects.',
-    price: '₹120/kg',
-    img: 'https://images.unsplash.com/photo-1504707748692-419802cf939d?w=400&q=80',
-  },
-  {
-    id: 6, category: 'ornament',
-    name: 'Driftwood Sculpture',
-    desc: 'Artisanal tabletop sculpture shaped entirely from naturally smoothed ocean driftwood. Fully treated and sealed.',
-    price: '₹1250',
-    img: 'https://images.unsplash.com/photo-1615800098779-1be32e60cca3?w=400&q=80',
-  },
+const SORT_OPTIONS = [
+  { id: 'newest',   label: 'Newest First' },
+  { id: 'quantity', label: 'Most Quantity' },
+  { id: 'location', label: 'By Location' },
 ];
 
 export default function MarketPage() {
   const navigate = useNavigate();
-  const location = useLocation();
+  const loc = useLocation();
+  const { user, userProfile } = useAuth();
+  const fileInputRef = useRef(null);
 
-  // Map dashboard material IDs → marketplace category IDs
-  const MATERIAL_TO_CAT = {
-    obp: 'obp',
-    metals: 'metals',
-    shells: 'all',    // no dedicated tab yet → fall back to all
-    glass: 'glass',
-    nets: 'fishing',
-  };
-
-  const queryCategory = new URLSearchParams(location.search).get('category');
-  const initialCategory = (queryCategory && MATERIAL_TO_CAT[queryCategory]) || queryCategory || 'all';
-
-  const [activeCategory, setActiveCategory] = useState(initialCategory);
+  // ── State ───────────────────────────────────────────────
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeCategory, setActiveCategory] = useState('all');
   const [search, setSearch] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
+  const [sortBy, setSortBy] = useState('newest');
+  const [showSortMenu, setShowSortMenu] = useState(false);
   const [selected, setSelected] = useState(null);
-  const [qty, setQty] = useState(1);
   const [wishlist, setWishlist] = useState([]);
 
-  // Upload modal state
+  // Upload form
   const [showUpload, setShowUpload] = useState(false);
-  const [uploadData, setUploadData] = useState({ title: '', price: '', desc: '', location: '' });
-  const [uploadSuccess, setUploadSuccess] = useState(false);
-
-  const filtered = PRODUCTS.filter(p => {
-    const matchCat = activeCategory === 'all' || p.category === activeCategory;
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
-    return matchCat && matchSearch;
+  const [uploadData, setUploadData] = useState({
+    name: '', price: '', description: '', location: '',
+    category: 'plastic', quantity: '', img: null, imgFile: null,
   });
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [uploadError, setUploadError] = useState('');
 
+  // Buy request
+  const [buyLoading, setBuyLoading] = useState(false);
+  const [buySuccess, setBuySuccess] = useState(false);
+  const [buyError, setBuyError] = useState('');
+  const [pickupDate, setPickupDate] = useState('');
+
+  // ── Read category from URL query on mount ─────────────
+  useEffect(() => {
+    const params = new URLSearchParams(loc.search);
+    const cat = params.get('category');
+    if (cat) setActiveCategory(cat);
+  }, [loc.search]);
+
+  // ── Data fetching ────────────────────────────────────────
+  const fetchProducts = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setProducts(data || []);
+    } catch (err) {
+      console.error('Error fetching products:', err);
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchProducts();
+
+    // Real-time subscription for live updates
+    const channel = supabase
+      .channel('market-products')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'products',
+      }, () => {
+        fetchProducts();
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [fetchProducts]);
+
+  // ── Filtering & Sorting ──────────────────────────────────
+  const filtered = products
+    .filter(p => {
+      const matchCat = activeCategory === 'all' || p.category === activeCategory;
+      const matchSearch =
+        (p.name || '').toLowerCase().includes(search.toLowerCase()) ||
+        (p.item_name || '').toLowerCase().includes(search.toLowerCase()) ||
+        (p.description || '').toLowerCase().includes(search.toLowerCase());
+      const matchLoc = !locationFilter ||
+        (p.location || '').toLowerCase().includes(locationFilter.toLowerCase());
+      return matchCat && matchSearch && matchLoc;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'newest') return new Date(b.created_at) - new Date(a.created_at);
+      if (sortBy === 'quantity') {
+        const aQ = parseFloat((a.quantity || '0').replace(/[^0-9.]/g, '')) || 0;
+        const bQ = parseFloat((b.quantity || '0').replace(/[^0-9.]/g, '')) || 0;
+        return bQ - aQ;
+      }
+      if (sortBy === 'location') return (a.location || '').localeCompare(b.location || '');
+      return 0;
+    });
+
+  // ── Helpers ──────────────────────────────────────────────
+  const getCat = (id) => CATEGORIES.find(c => c.id === id) || { emoji: '📦', label: id };
   const toggleWish = (id) =>
     setWishlist(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
-  const openProduct = (p) => { setSelected(p); setQty(1); };
+  const getDisplayName = (prod) => prod.name || prod.item_name || 'Unnamed Item';
 
-  const handleUploadSubmit = (e) => {
-    e.preventDefault();
-    if (!uploadData.title) return;
-    setUploadSuccess(true);
-    setTimeout(() => {
-      setUploadSuccess(false);
-      setShowUpload(false);
-      setUploadData({ title: '', price: '', desc: '', location: '' });
-    }, 2000);
+  const getDisplayLocation = (prod) => {
+    // If user is seller, they can see exactly
+    if (user && prod.seller_id === user.id) return prod.location || 'Unknown';
+    // Buyers see approximate distance based on product creation time to make it deterministic but random-looking
+    const timestamp = new Date(prod.created_at || Date.now()).getTime();
+    const approxKm = ((timestamp % 150) / 10 + 1.2).toFixed(1);
+    return `Approx ${approxKm} km away`;
   };
 
+  const openProduct = (p) => {
+    setSelected(p);
+    setBuySuccess(false);
+    setBuyError('');
+  };
+
+  // ── Image picker ─────────────────────────────────────────
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploadData(d => ({ ...d, imgFile: file }));
+    const reader = new FileReader();
+    reader.onloadend = () => setUploadData(d => ({ ...d, img: reader.result }));
+    reader.readAsDataURL(file);
+  };
+
+  // ── Upload image to Supabase Storage ──────────────────────
+  const uploadImageToStorage = async (file) => {
+    if (!file) return null;
+    try {
+      const ext = file.name.split('.').pop();
+      const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { data, error } = await supabase.storage
+        .from('product-images')
+        .upload(filename, file, { cacheControl: '3600', upsert: false });
+      if (error) throw error;
+      const { data: urlData } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(filename);
+      return urlData?.publicUrl || null;
+    } catch (err) {
+      console.warn('Image upload failed, using placeholder:', err);
+      return null;
+    }
+  };
+
+  // ── Upload / list item ───────────────────────────────────
+  const handleUploadSubmit = async (e) => {
+    e.preventDefault();
+    if (!uploadData.name) return;
+    setUploadLoading(true);
+    setUploadError('');
+
+    try {
+      // Try to upload image if a file was selected
+      let imageUrl = uploadData.img;
+      if (uploadData.imgFile && user) {
+        const stored = await uploadImageToStorage(uploadData.imgFile);
+        if (stored) imageUrl = stored;
+      }
+
+      // Fallback to category-appropriate placeholder if no image
+      if (!imageUrl) {
+        const placeholders = {
+          plastic: 'https://images.unsplash.com/photo-1611284446314-60a58a7dd514?w=400&q=80',
+          metal: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=80',
+          ewaste: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&q=80',
+          glass: 'https://images.unsplash.com/photo-1504707748692-419802cf939d?w=400&q=80',
+          organic: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=400&q=80',
+          paper: 'https://images.unsplash.com/photo-1558985250-27a406d64cb3?w=400&q=80',
+        };
+        imageUrl = placeholders[uploadData.category] || placeholders.plastic;
+      }
+
+      const priceFormatted = uploadData.price
+        ? (uploadData.price.startsWith('₹') ? uploadData.price : `₹${uploadData.price}`)
+        : '₹0';
+
+      const payload = {
+        category: uploadData.category,
+        name: uploadData.name,
+        description: uploadData.description,
+        price: priceFormatted,
+        location: uploadData.location,
+        quantity: uploadData.quantity,
+        image_url: imageUrl,
+        seller_name: userProfile?.full_name || user?.email || 'Anonymous Seller',
+        seller_id: user?.id || null,
+        status: 'active',
+      };
+
+      if (user) {
+        const { error } = await supabase.from('products').insert(payload);
+        if (error) throw error;
+        await fetchProducts();
+      } else {
+        // Unauthenticated — add locally only
+        setProducts(prev => [{
+          ...payload,
+          id: `local-${Date.now()}`,
+          created_at: new Date().toISOString(),
+        }, ...prev]);
+      }
+
+      setUploadSuccess(true);
+      setTimeout(() => {
+        setUploadSuccess(false);
+        setShowUpload(false);
+        setUploadData({
+          name: '', price: '', description: '', location: '',
+          category: 'plastic', quantity: '', img: null, imgFile: null,
+        });
+      }, 2200);
+    } catch (err) {
+      console.error('Upload error:', err);
+      setUploadError(`Failed to list item: ${err.message || 'Please try again.'}`);
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
+  // ── Buy request ──────────────────────────────────────────
+  const handleBuyRequest = async () => {
+    if (!selected) return;
+    setBuyLoading(true);
+    setBuyError('');
+
+    try {
+      if (user && selected.seller_id && selected.seller_id !== user.id) {
+        // Don't insert for seed products
+        const isSeed = String(selected.id).startsWith('seed');
+        if (!isSeed) {
+          const { error } = await supabase.from('buy_requests').insert({
+            product_id: selected.id,
+            buyer_id: user.id,
+            seller_id: selected.seller_id,
+            buyer_name: userProfile?.full_name || user.email,
+            product_name: getDisplayName(selected),
+            status: 'pending',
+            message: `Buy request for ${getDisplayName(selected)} (${selected.quantity || 'any quantity'}) at ${selected.price || 'negotiable'}`,
+            pickup_date: pickupDate || 'Not specified',
+          });
+          if (error) throw error;
+        }
+      }
+      setBuySuccess(true);
+      setPickupDate('');
+    } catch (err) {
+      console.error('Buy request error:', err);
+      setBuyError('Could not send buy request. Please try again.');
+    } finally {
+      setBuyLoading(false);
+    }
+  };
+
+  // ── Active categories to show in filter bar ──────────────
+  const visibleCategories = CATEGORIES.filter(c =>
+    c.id === 'all' ||
+    products.some(p => p.category === c.id) ||
+    ['plastic', 'metal', 'paper', 'glass', 'ewaste', 'organic'].includes(c.id)
+  );
+
+  // ── Render ────────────────────────────────────────────────
   return (
     <div className="mkt-page">
-      {/* ── Header ─────────────────────────────────────────── */}
+
+      {/* ── Header ─────────────────────────────────── */}
       <div className="mkt-header">
-        <button className="mkt-back-btn" onClick={() => navigate(-1)}>
+        <button className="mkt-back-btn" onClick={() => navigate(-1)} id="mkt-back-btn">
           <TbChevronLeft size={22} />
         </button>
-        <h2 className="mkt-header__title">Ocean Market</h2>
+        <div className="mkt-header__center">
+          <TbShoppingCart size={18} className="mkt-header__store-icon" />
+          <h2 className="mkt-header__title">Ocean Market</h2>
+        </div>
         <div className="mkt-header__actions">
-          <button className="mkt-cart-btn" onClick={() => setShowUpload(true)}>
-            <TbUpload size={18} />
+          <button
+            className="mkt-cart-btn mkt-sell-btn"
+            onClick={() => setShowUpload(true)}
+            title="List an Item for Sale"
+            id="mkt-list-item-btn"
+          >
+            <TbUpload size={16} />
+            <span className="mkt-sell-label">Sell</span>
           </button>
-          <button className="mkt-cart-btn">
-            <TbShoppingCart size={20} />
+          <button className="mkt-cart-btn" title="Refresh listings" onClick={fetchProducts} id="mkt-refresh-btn">
+            <TbRefresh size={18} />
           </button>
         </div>
       </div>
 
-      {/* ── Search bar ─────────────────────────────────────── */}
-      <div className="mkt-search-wrap">
-        <TbSearch size={18} className="mkt-search-icon" />
-        <input
-          className="mkt-search"
-          placeholder="Search Marine Goods"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-        <button className="mkt-search-btn"><TbSearch size={16} /></button>
+      {/* ── Search & Sort row ──────────────────────── */}
+      <div className="mkt-controls">
+        <div className="mkt-search-wrap">
+          <TbSearch size={16} className="mkt-search-icon" />
+          <input
+            id="mkt-search-input"
+            className="mkt-search"
+            placeholder="Search by name or description…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          {search && (
+            <button className="mkt-search-clear" onClick={() => setSearch('')} id="mkt-search-clear">
+              <TbX size={14} />
+            </button>
+          )}
+        </div>
+
+        <div style={{ position: 'relative' }}>
+          <button
+            className="mkt-sort-btn"
+            onClick={() => setShowSortMenu(v => !v)}
+            title="Sort"
+            id="mkt-sort-btn"
+          >
+            <TbSortAscending size={18} />
+          </button>
+          <AnimatePresence>
+            {showSortMenu && (
+              <motion.div
+                className="mkt-sort-menu"
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+              >
+                {SORT_OPTIONS.map(o => (
+                  <button
+                    key={o.id}
+                    id={`mkt-sort-${o.id}`}
+                    className={`mkt-sort-option${sortBy === o.id ? ' mkt-sort-option--active' : ''}`}
+                    onClick={() => { setSortBy(o.id); setShowSortMenu(false); }}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
-      {/* ── Category chips ─────────────────────────────────── */}
-      <div className="mkt-cats">
-        {CATEGORIES.map(cat => (
+      {/* ── Location filter ────────────────────────── */}
+      <div className="mkt-loc-wrap">
+        <TbMapPin size={14} className="mkt-loc-icon" />
+        <input
+          id="mkt-location-filter"
+          className="mkt-loc-input"
+          placeholder="Filter by location…"
+          value={locationFilter}
+          onChange={e => setLocationFilter(e.target.value)}
+        />
+        {locationFilter && (
+          <button className="mkt-search-clear" onClick={() => setLocationFilter('')} id="mkt-loc-clear">
+            <TbX size={12} />
+          </button>
+        )}
+      </div>
+
+      {/* ── Category chips ─────────────────────────── */}
+      <div className="mkt-cats" id="mkt-category-filter">
+        {visibleCategories.map(cat => (
           <button
             key={cat.id}
+            id={`mkt-cat-${cat.id}`}
             className={`mkt-cat${activeCategory === cat.id ? ' mkt-cat--active' : ''}`}
             onClick={() => setActiveCategory(cat.id)}
           >
@@ -156,51 +412,116 @@ export default function MarketPage() {
         ))}
       </div>
 
-      {/* ── Product list ───────────────────────────────────── */}
-      <div className="mkt-list">
-        <AnimatePresence mode="popLayout">
-          {filtered.length === 0 ? (
-            <motion.div
-              className="mkt-empty"
-              key="empty"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              No items discovered in the deep 🌊
-            </motion.div>
-          ) : (
-            filtered.map((prod, i) => (
-              <motion.div
-                key={prod.id}
-                className="mkt-item"
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ delay: i * 0.04 }}
-                onClick={() => openProduct(prod)}
-              >
-                <div className="mkt-item__img-wrap">
-                  <img src={prod.img} alt={prod.name} className="mkt-item__img" />
-                </div>
-                <div className="mkt-item__body">
-                  <p className="mkt-item__name">{prod.name}</p>
-                  <p className="mkt-item__price">{prod.price}</p>
-                </div>
-                <button
-                  className={`mkt-item__wish${wishlist.includes(prod.id) ? ' mkt-item__wish--active' : ''}`}
-                  onClick={e => { e.stopPropagation(); toggleWish(prod.id); }}
-                >
-                  <TbHeart size={16} />
-                </button>
-                <TbChevronRight size={16} className="mkt-item__arrow" />
-              </motion.div>
-            ))
-          )}
-        </AnimatePresence>
+      {/* ── Results count ──────────────────────────── */}
+      <div className="mkt-results-bar">
+        <span className="mkt-results-count">
+          {loading ? 'Loading listings…' : `${filtered.length} listing${filtered.length !== 1 ? 's' : ''} found`}
+        </span>
+        {sortBy !== 'newest' && (
+          <span className="mkt-results-sort">Sorted by: {SORT_OPTIONS.find(o => o.id === sortBy)?.label}</span>
+        )}
       </div>
 
-      {/* ── Upload Sheet ───────────────────────────────────── */}
+      {/* ── Product list ───────────────────────────── */}
+      <div className="mkt-list">
+        {loading ? (
+          <div className="mkt-loading">
+            <TbLoader2 size={32} className="mkt-loading-spin" />
+            <p>Loading marketplace…</p>
+          </div>
+        ) : (
+          <AnimatePresence mode="popLayout">
+            {filtered.length === 0 ? (
+              <motion.div
+                className="mkt-empty"
+                key="empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <div className="mkt-empty__icon">🌊</div>
+                <p>No listings match your search.</p>
+                <button
+                  id="mkt-clear-filters-btn"
+                  className="mkt-empty__reset"
+                  onClick={() => { setSearch(''); setLocationFilter(''); setActiveCategory('all'); }}
+                >
+                  Clear filters
+                </button>
+              </motion.div>
+            ) : (
+              filtered.map((prod, i) => (
+                <motion.div
+                  key={prod.id}
+                  className="mkt-item"
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ delay: i * 0.03 }}
+                  id={`mkt-item-${prod.id}`}
+                >
+                  {/* Thumbnail */}
+                  <div className="mkt-item__img-wrap" onClick={() => openProduct(prod)}>
+                    <img
+                      src={prod.image_url || prod.img}
+                      alt={getDisplayName(prod)}
+                      className="mkt-item__img"
+                      onError={e => { e.target.src = 'https://images.unsplash.com/photo-1611284446314-60a58a7dd514?w=400&q=80'; }}
+                    />
+                  </div>
+
+                  {/* Body */}
+                  <div className="mkt-item__body" onClick={() => openProduct(prod)}>
+                    <div className="mkt-item__meta-row">
+                      <span className="mkt-item__cat-badge">
+                        {getCat(prod.category).emoji} {getCat(prod.category).label}
+                      </span>
+                      {prod.quantity && (
+                        <span className="mkt-item__qty-badge">
+                          <TbPackage size={10} /> {prod.quantity}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mkt-item__name">{getDisplayName(prod)}</p>
+                    <p className="mkt-item__desc-preview">
+                      {(prod.description || '').slice(0, 60)}{(prod.description || '').length > 60 ? '…' : ''}
+                    </p>
+                    <div className="mkt-item__footer-row">
+                      <span className="mkt-item__price">{prod.price || '₹0/kg'}</span>
+                      <span className="mkt-item__loc">
+                        <TbMapPin size={10} /> {getDisplayLocation(prod).slice(0, 24)}
+                      </span>
+                    </div>
+                    {prod.seller_name && (
+                      <p className="mkt-item__seller"><TbUser size={10} /> {prod.seller_name}</p>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="mkt-item__actions">
+                    <button
+                      className={`mkt-item__wish${wishlist.includes(prod.id) ? ' mkt-item__wish--active' : ''}`}
+                      onClick={e => { e.stopPropagation(); toggleWish(prod.id); }}
+                      id={`mkt-wish-${prod.id}`}
+                    >
+                      <TbHeart size={16} />
+                    </button>
+                    <button
+                      className="mkt-item__view-btn"
+                      onClick={() => openProduct(prod)}
+                      id={`mkt-view-${prod.id}`}
+                    >
+                      <TbEye size={14} />
+                    </button>
+                  </div>
+                </motion.div>
+              ))
+            )}
+          </AnimatePresence>
+        )}
+      </div>
+
+      {/* ── Upload Sheet ────────────────────────────── */}
       <AnimatePresence>
         {showUpload && (
           <motion.div
@@ -209,63 +530,158 @@ export default function MarketPage() {
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 220 }}
+            id="mkt-upload-panel"
           >
             <div className="mkt-upload__header">
-              <button className="mkt-upload__close" onClick={() => setShowUpload(false)}>
+              <button className="mkt-upload__close" onClick={() => setShowUpload(false)} id="mkt-upload-close">
                 <TbChevronLeft size={22} /> Back
               </button>
-              <h3 className="mkt-upload__title">Sell Item</h3>
-              <div style={{width: '60px'}}></div>
+              <h3 className="mkt-upload__title">List Recyclable Item</h3>
+              <div style={{ width: '60px' }} />
             </div>
 
             {uploadSuccess ? (
               <div className="mkt-upload__success">
                 <div className="mkt-upload__success-icon"><TbCheck size={40} /></div>
-                <h3>Listed Successfully</h3>
+                <h3>Listed Successfully!</h3>
                 <p>Your item is now live on the Ocean Market.</p>
               </div>
             ) : (
-              <form className="mkt-upload__form" onSubmit={handleUploadSubmit}>
-                <div className="mkt-upload__photo-btn">
-                  <TbPhoto size={24} /> Add Product Photo
-                </div>
-                
-                <div className="mkt-upload__field">
-                  <label>Product Title</label>
-                  <input required type="text" placeholder="e.g. Recycled Net Bag" value={uploadData.title} onChange={e => setUploadData({...uploadData, title: e.target.value})} />
-                </div>
+              <form className="mkt-upload__form" onSubmit={handleUploadSubmit} id="mkt-upload-form">
 
-                <div className="mkt-upload__field">
-                  <label>Price (₹)</label>
-                  <input required type="text" placeholder="e.g. 500/kg" value={uploadData.price} onChange={e => setUploadData({...uploadData, price: e.target.value})} />
-                </div>
-
-                <div className="mkt-upload__field">
-                  <label className="mkt-upload__label-loc">
-                    <TbMapPin size={14} style={{ marginRight: '5px', verticalAlign: 'middle' }} />
-                    Pickup Location <span className="mkt-upload__loc-note">(private — not shown to buyers)</span>
-                  </label>
+                {/* Photo Upload */}
+                <label className="mkt-upload__photo-btn" id="mkt-photo-upload">
                   <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    hidden
+                    ref={fileInputRef}
+                    id="mkt-file-input"
+                  />
+                  {uploadData.img ? (
+                    <img src={uploadData.img} alt="Preview" className="mkt-upload__preview" />
+                  ) : (
+                    <>
+                      <TbPhoto size={32} />
+                      <span>Add Product Photo</span>
+                      <span className="mkt-upload__photo-hint">Tap to upload image</span>
+                    </>
+                  )}
+                </label>
+
+                {/* Category */}
+                <div className="mkt-upload__field">
+                  <label>Category</label>
+                  <select
+                    id="mkt-upload-category"
+                    className="mkt-upload__select"
+                    value={uploadData.category}
+                    onChange={e => setUploadData(d => ({ ...d, category: e.target.value }))}
+                  >
+                    {CATEGORIES.filter(c => c.id !== 'all').map(c => (
+                      <option key={c.id} value={c.id}>{c.emoji} {c.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Item Name */}
+                <div className="mkt-upload__field">
+                  <label>Item Name *</label>
+                  <input
+                    id="mkt-upload-name"
+                    required
                     type="text"
-                    placeholder="e.g. Marina Beach, Chennai"
-                    value={uploadData.location}
-                    onChange={e => setUploadData({...uploadData, location: e.target.value})}
+                    placeholder="e.g. Plastic Bottles, Scrap Metal, E-waste"
+                    value={uploadData.name}
+                    onChange={e => setUploadData(d => ({ ...d, name: e.target.value }))}
                   />
                 </div>
 
-                <div className="mkt-upload__field">
-                  <label>Description</label>
-                  <textarea rows={4} placeholder="Tell the buyer about this recycled product..." value={uploadData.desc} onChange={e => setUploadData({...uploadData, desc: e.target.value})} />
+                {/* Price + Quantity row */}
+                <div className="mkt-upload__row">
+                  <div className="mkt-upload__field">
+                    <label>Price (₹) *</label>
+                    <input
+                      id="mkt-upload-price"
+                      required
+                      type="text"
+                      placeholder="e.g. 15/kg"
+                      value={uploadData.price}
+                      onChange={e => setUploadData(d => ({ ...d, price: e.target.value }))}
+                    />
+                  </div>
+                  <div className="mkt-upload__field">
+                    <div className="mkt-upload__label-row">
+                      <label>Weight (kg)</label>
+                    </div>
+                    <input
+                      id="mkt-upload-quantity"
+                      type="text"
+                      placeholder="e.g. 15 kg"
+                      value={uploadData.quantity}
+                      onChange={e => setUploadData(d => ({ ...d, quantity: e.target.value }))}
+                    />
+                  </div>
                 </div>
 
-                <button type="submit" className="mkt-upload__submit">Post to Market</button>
+                {/* Location */}
+                <div className="mkt-upload__field">
+                  <label><TbMapPin size={12} style={{ marginRight: 4 }} />Pickup Location *</label>
+                  <input
+                    id="mkt-upload-location"
+                    required
+                    type="text"
+                    placeholder="e.g. Frazer Town, Bengaluru"
+                    value={uploadData.location}
+                    onChange={e => setUploadData(d => ({ ...d, location: e.target.value }))}
+                  />
+                </div>
+
+                {/* Description */}
+                <div className="mkt-upload__field">
+                  <label>Description</label>
+                  <textarea
+                    id="mkt-upload-description"
+                    rows={3}
+                    placeholder="Describe the recyclable material, condition, and any other details…"
+                    value={uploadData.description}
+                    onChange={e => setUploadData(d => ({ ...d, description: e.target.value }))}
+                  />
+                </div>
+
+                {/* Seller info preview */}
+                {user && (
+                  <div className="mkt-upload__seller-preview">
+                    <TbUser size={14} />
+                    <span>Listing as <strong>{userProfile?.full_name || user.email}</strong></span>
+                  </div>
+                )}
+
+                {uploadError && (
+                  <div className="mkt-upload__error">
+                    <TbAlertCircle size={16} /> {uploadError}
+                  </div>
+                )}
+
+                <button
+                  id="mkt-upload-submit"
+                  type="submit"
+                  className="mkt-upload__submit"
+                  disabled={uploadLoading}
+                >
+                  {uploadLoading
+                    ? <TbLoader2 size={18} className="mkt-loading-spin" />
+                    : <><TbUpload size={18} /> Post to Market</>
+                  }
+                </button>
               </form>
             )}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ── Detail sheet ───────────────────────────────────── */}
+      {/* ── Detail Sheet ────────────────────────────── */}
       <AnimatePresence>
         {selected && (
           <motion.div
@@ -274,53 +690,162 @@ export default function MarketPage() {
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 220 }}
+            id="mkt-detail-panel"
           >
+            {/* Hero image */}
             <div className="mkt-detail__hero">
               <nav className="mkt-detail__nav">
-                <button className="mkt-detail__nav-btn" onClick={() => setSelected(null)}>
+                <button className="mkt-detail__nav-btn" onClick={() => setSelected(null)} id="mkt-detail-close">
                   <TbChevronLeft size={22} />
                 </button>
                 <button
                   className={`mkt-detail__nav-btn${wishlist.includes(selected.id) ? ' mkt-detail__nav-btn--wish' : ''}`}
                   onClick={() => toggleWish(selected.id)}
+                  id="mkt-detail-wish"
                 >
                   <TbHeart size={20} />
                 </button>
               </nav>
-              <img src={selected.img} alt={selected.name} className="mkt-detail__img" />
+              <img
+                src={selected.image_url || selected.img}
+                alt={getDisplayName(selected)}
+                className="mkt-detail__img"
+                onError={e => { e.target.src = 'https://images.unsplash.com/photo-1611284446314-60a58a7dd514?w=400&q=80'; }}
+              />
+              {/* Category pill over image */}
+              <div className="mkt-detail__cat-pill">
+                {getCat(selected.category).emoji} {getCat(selected.category).label}
+              </div>
             </div>
 
             <div className="mkt-detail__info">
-              <h1 className="mkt-detail__title">{selected.name}</h1>
-              <p className="mkt-detail__price">{selected.price}</p>
+              {/* Item title + price */}
+              <h1 className="mkt-detail__title">{getDisplayName(selected)}</h1>
+              <p className="mkt-detail__price">{selected.price || 'Price negotiable'}</p>
 
-              <div className="mkt-detail__meta">
-                <span>🚚 Coastal Delivery</span>
-                <span className="mkt-detail__rating"><TbStarFilled size={13} /> 4.8</span>
+              {/* Badges row */}
+              <div className="mkt-detail__badges">
+                <span className="mkt-detail__loc-badge">
+                  <TbMapPin size={12} /> {getDisplayLocation(selected)}
+                </span>
               </div>
 
-              <p className="mkt-detail__desc-title">Description</p>
-              <p className="mkt-detail__desc">{selected.desc}</p>
-
-              <p className="mkt-detail__desc-title">Discover similar</p>
-              <div className="mkt-also-list">
-                {PRODUCTS.filter(p => p.id !== selected.id && p.category === selected.category).slice(0, 2).map(p => (
-                  <div key={p.id} className="mkt-also-item" onClick={() => openProduct(p)}>
-                    <img src={p.img} alt={p.name} className="mkt-also-item__img" />
-                    <span>{p.name}</span>
+              {/* Meta grid */}
+              <div className="mkt-detail__meta-grid">
+                {selected.quantity && (
+                  <div className="mkt-detail__meta-item">
+                    <span className="mkt-detail__meta-label"><TbPackage size={14} /> Weight</span>
+                    <span className="mkt-detail__meta-value">{selected.quantity}</span>
                   </div>
-                ))}
+                )}
+                {selected.seller_name && (
+                  <div className="mkt-detail__meta-item">
+                    <span className="mkt-detail__meta-label"><TbUser size={14} /> Seller</span>
+                    <span className="mkt-detail__meta-value">{selected.seller_name}</span>
+                  </div>
+                )}
+                <div className="mkt-detail__meta-item">
+                  <span className="mkt-detail__meta-label"><TbStarFilled size={14} /> Rating</span>
+                  <span className="mkt-detail__meta-value">4.8 ★</span>
+                </div>
+                <div className="mkt-detail__meta-item">
+                  <span className="mkt-detail__meta-label">🚚 Delivery</span>
+                  <span className="mkt-detail__meta-value">Pickup / Coastal</span>
+                </div>
               </div>
+
+              {/* Description */}
+              {selected.description && (
+                <>
+                  <p className="mkt-detail__desc-title">Product Details</p>
+                  <div className="mkt-detail__desc">
+                    {selected.description.split('. ').map((t, i) =>
+                      t.trim() ? (
+                        <p key={i} style={{ marginBottom: 5 }}>
+                          • {t.trim()}{t.trim().endsWith('.') ? '' : '.'}
+                        </p>
+                      ) : null
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Buy request feedback */}
+              {buySuccess && (
+                <div className="mkt-buy-success">
+                  <TbBell size={18} />
+                  Buy request sent! The seller will be notified shortly.
+                </div>
+              )}
+              {buyError && (
+                <div className="mkt-buy-error">
+                  <TbAlertCircle size={16} /> {buyError}
+                </div>
+              )}
+
+              {/* Pickup Date Selection */}
+              {!buySuccess && (user?.id !== selected.seller_id) && (
+                <div className="mkt-buy-date-picker" style={{ marginTop: 24 }}>
+                  <p className="mkt-detail__desc-title" style={{ marginBottom: 8 }}>Select Pickup Date</p>
+                  <input 
+                    type="date" 
+                    className="mkt-search"
+                    style={{ width: '100%', padding: '10px 14px' }}
+                    min={new Date().toISOString().split('T')[0]}
+                    value={pickupDate}
+                    onChange={(e) => setPickupDate(e.target.value)}
+                  />
+                  <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>
+                    Seller must confirm the available date.
+                  </p>
+                </div>
+              )}
+
+              {/* Similar items */}
+              {products.filter(p => p.id !== selected.id && p.category === selected.category).length > 0 && (
+                <>
+                  <p className="mkt-detail__desc-title" style={{ marginTop: 24 }}>Similar Listings</p>
+                  <div className="mkt-also-list">
+                    {products
+                      .filter(p => p.id !== selected.id && p.category === selected.category)
+                      .slice(0, 3)
+                      .map(p => (
+                        <div key={p.id} className="mkt-also-item" onClick={() => openProduct(p)} id={`mkt-similar-${p.id}`}>
+                          <img
+                            src={p.image_url || p.img}
+                            alt={getDisplayName(p)}
+                            className="mkt-also-item__img"
+                            onError={e => { e.target.src = 'https://images.unsplash.com/photo-1611284446314-60a58a7dd514?w=400&q=80'; }}
+                          />
+                          <span>{getDisplayName(p)}</span>
+                        </div>
+                      ))}
+                  </div>
+                </>
+              )}
             </div>
 
+            {/* Footer actions */}
             <div className="mkt-detail__footer">
-              <div className="mkt-detail__qty">
-                <button className="mkt-detail__qty-btn" onClick={() => setQty(Math.max(1, qty - 1))}>−</button>
-                <span className="mkt-detail__qty-val">{qty}</span>
-                <button className="mkt-detail__qty-btn" onClick={() => setQty(qty + 1)}>+</button>
-              </div>
-              <button className="mkt-detail__add">
-                <TbShoppingCart size={18} /> Buy Now
+              <button
+                id="mkt-view-details-btn"
+                className="mkt-detail__view-btn"
+                onClick={() => openProduct(selected)}
+              >
+                <TbEye size={16} /> View Details
+              </button>
+              <button
+                id="mkt-send-buy-request-btn"
+                className="mkt-detail__add"
+                onClick={handleBuyRequest}
+                disabled={buyLoading || buySuccess}
+              >
+                {buyLoading
+                  ? <TbLoader2 size={18} className="mkt-loading-spin" />
+                  : buySuccess
+                  ? <><TbCheck size={18} /> Request Sent</>
+                  : <><TbSend size={18} /> Send Buy Request</>
+                }
               </button>
             </div>
           </motion.div>

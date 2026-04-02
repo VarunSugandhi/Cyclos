@@ -3,9 +3,10 @@ import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { TbX, TbEdit, TbCameraPlus, TbLogout, TbCheck, TbTrendingUp, TbRipple, TbLeaf, TbCalendarEvent, TbMapPin, TbTrash } from 'react-icons/tb';
+import { TbX, TbEdit, TbCameraPlus, TbLogout, TbCheck, TbTrendingUp, TbRipple, TbLeaf, TbCalendarEvent, TbMapPin, TbTrash, TbQrcode } from 'react-icons/tb';
 import { supabase } from '../supabase/supabaseClient';
 import { toast } from 'react-hot-toast';
+import QRCode from 'react-qr-code';
 import './ProfilePanel.css';
 
 export default function ProfilePanel({ isOpen, onClose }) {
@@ -24,8 +25,26 @@ export default function ProfilePanel({ isOpen, onClose }) {
   React.useEffect(() => {
     if (isOpen && user) {
       fetchUserEvents();
+      fetchAcceptedRequests();
     }
   }, [isOpen, user]);
+
+  const [acceptedRequests, setAcceptedRequests] = useState([]);
+  const [selectedQR, setSelectedQR] = useState(null);
+
+  const fetchAcceptedRequests = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('buy_requests')
+        .select('*')
+        .eq('seller_id', user.id)
+        .eq('status', 'accepted');
+      if (error) throw error;
+      setAcceptedRequests(data || []);
+    } catch (err) {
+      console.error('Error fetching accepted requests:', err);
+    }
+  };
 
   const fetchUserEvents = async () => {
     setLoadingEvents(true);
@@ -198,14 +217,14 @@ export default function ProfilePanel({ isOpen, onClose }) {
                     <div className="stat-card__icon bg-green"><TbTrendingUp size={20} /></div>
                     <div className="stat-card__data">
                       <span className="stat-label">Kg Recycled</span>
-                      <span className="stat-value">142 kg</span>
+                      <span className="stat-value">{userProfile?.total_recycled_weight || 0} kg</span>
                     </div>
                   </div>
                   <div className="stat-card">
                     <div className="stat-card__icon bg-teal"><TbLeaf size={20} /></div>
                     <div className="stat-card__data">
                       <span className="stat-label">Points Earned</span>
-                      <span className="stat-value">8,450</span>
+                      <span className="stat-value">{userProfile?.points || 0}</span>
                     </div>
                   </div>
                   <div className="stat-card">
@@ -218,7 +237,6 @@ export default function ProfilePanel({ isOpen, onClose }) {
                 </div>
               </div>
 
-              {/* Section 3: Active Events */}
               <div className="panel-section">
                 <h4 className="section-title">My Active Events</h4>
                 <div className="active-events-list">
@@ -243,6 +261,39 @@ export default function ProfilePanel({ isOpen, onClose }) {
                   )}
                 </div>
               </div>
+
+              {/* Section: Pending Pickups / QR Codes */}
+              {acceptedRequests.length > 0 && (
+                <div className="panel-section">
+                  <h4 className="section-title">Pending Pickups</h4>
+                  <div className="active-events-list">
+                    {acceptedRequests.map(req => (
+                      <div key={req.id} className="user-event-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                        <div className="user-event-card__info" style={{ width: '100%' }}>
+                          <h5>{req.product_name}</h5>
+                          <span style={{ fontSize: '11px', color: 'var(--teal-300)' }}>Buyer: {req.buyer_name}</span>
+                          <span style={{ fontSize: '11px' }}>Date: {req.pickup_date || 'TBD'}</span>
+                        </div>
+                        {selectedQR === req.id ? (
+                          <div style={{ marginTop: 12, padding: 12, background: 'white', borderRadius: 8, alignSelf: 'center' }}>
+                            <QRCode value={`REQ-${req.id}-${req.buyer_id}`} size={120} />
+                            <p style={{ textAlign: 'center', color: '#000', fontSize: 10, marginTop: 6, marginBottom: 0 }}>Show to Buyer</p>
+                            <button className="btn-deactivate" style={{ marginTop: 10, width: '100%', background: 'rgb(241 11 11 / 15%)', color: 'red' }} onClick={() => setSelectedQR(null)}>Hide</button>
+                          </div>
+                        ) : (
+                          <button 
+                            className="btn-deactivate" 
+                            style={{ background: 'var(--teal-300)', color: 'var(--ocean-900)', marginTop: 8 }}
+                            onClick={() => setSelectedQR(req.id)}
+                          >
+                            <TbQrcode size={16} /> Show QR Code
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Section 3: Marketplace Activity */}
               <div className="panel-section">
