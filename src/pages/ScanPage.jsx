@@ -35,32 +35,59 @@ export default function ScanPage() {
       const realId = reqIdParts[1];
       const buyerId = reqIdParts[2];
       
-      if (user.id !== buyerId) {
-        throw new Error("This QR doesn't belong to your account.");
-      }
-
-      // Mark request complete
-      const { data: request, error } = await supabase
-        .from('buy_requests')
-        .update({ status: 'completed' })
-        .eq('id', realId)
+      // Verification: The seller (current user) is scanning the buyer's QR
+      // The QR code contains the buyer's ID to ensure they are the correct recipient.
+      
+      const { data: request, error: fetchErr } = await supabase
+        .from('market_orders')
         .select('*')
+        .eq('id', realId)
         .single();
         
-      if (error) throw error;
+      if (fetchErr || !request) throw new Error("Request not found");
+      if (request.status !== 'accepted') throw new Error("Transaction not ready for pickup");
+      if (request.seller_id !== user.id) throw new Error("You are not the seller of this item");
+
+      // Extract weight from quantity string (e.g., "15 kg" -> 15)
+      const numericWeight = parseFloat(request.quantity?.replace(/[^0-9.]/g, '')) || 5;
+      const pointsToAward = Math.round(numericWeight * 5); // 5 points per kg
+
+      // Mark request complete
+      const { error: updateErr } = await supabase
+        .from('market_orders')
+        .update({ status: 'completed' })
+        .eq('id', realId);
+        
+      if (updateErr) throw updateErr;
       
-      // Basic logic to award points
-      try {
-        await supabase.from('profiles').update({ points: 50, total_recycled_weight: 10 }).eq('id', user.id); 
-        await supabase.from('profiles').update({ points: 50, total_recycled_weight: 10 }).eq('id', request.seller_id);
-      } catch (e) {
-        console.error('Points increment failed, but transaction completed', e);
+      // Update Profiles: Buyer gets points and weight, Seller gets points
+      // 1. Update Buyer
+      const { data: buyerProfile } = await supabase.from('profiles').select('points, total_recycled_weight').eq('id', buyerId).single();
+      if (buyerProfile) {
+        await supabase.from('profiles').update({ 
+          points: (buyerProfile.points || 0) + pointsToAward,
+          total_recycled_weight: (buyerProfile.total_recycled_weight || 0) + numericWeight
+        }).eq('id', buyerId);
+      }
+
+      // 2. Update Seller (Current User)
+      const { data: sellerProfile } = await supabase.from('profiles').select('points').eq('id', user.id).single();
+      if (sellerProfile) {
+        await supabase.from('profiles').update({ 
+          points: (sellerProfile.points || 0) + pointsToAward 
+        }).eq('id', user.id);
       }
       
-      setQrMessage('Transaction successfully completed!');
-      toast.success('Pick-up verified! Points awarded to both users.');
+      setQrMessage('Pickup Verified! ECO points awarded.');
+      toast.success(`Transaction complete! +${pointsToAward} ECO points.`);
       setScanned(true);
-      setResult({ type: 'Purchase Verified', weight_estimation: 'Added 10kg to Profile', recycling_cost: '+50 Points' });
+      setResult({ 
+        type: 'Transaction Verified', 
+        weight_estimation: `${numericWeight} kg processed`, 
+        recycling_cost: `+${pointsToAward} ECO Points`,
+        co2_impact: `${(numericWeight * 1.5).toFixed(1)} kg CO2 saved`,
+        recycled_product_suggestion: 'Proceed to nearest sorting hub'
+      });
     } catch (err) {
       console.error(err);
       toast.error(err.message || 'Failed to verify transaction');

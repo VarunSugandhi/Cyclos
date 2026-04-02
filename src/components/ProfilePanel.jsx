@@ -26,10 +26,12 @@ export default function ProfilePanel({ isOpen, onClose }) {
     if (isOpen && user) {
       fetchUserEvents();
       fetchAcceptedRequests();
+      fetchPendingPurchases();
     }
   }, [isOpen, user]);
 
   const [acceptedRequests, setAcceptedRequests] = useState([]);
+  const [pendingPurchases, setPendingPurchases] = useState([]);
   const [selectedQR, setSelectedQR] = useState(null);
 
   const fetchAcceptedRequests = async () => {
@@ -43,6 +45,20 @@ export default function ProfilePanel({ isOpen, onClose }) {
       setAcceptedRequests(data || []);
     } catch (err) {
       console.error('Error fetching accepted requests:', err);
+    }
+  };
+
+  const fetchPendingPurchases = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('market_orders')
+        .select('*')
+        .eq('buyer_id', user.id)
+        .eq('status', 'accepted');
+      if (error) throw error;
+      setPendingPurchases(data || []);
+    } catch (err) {
+      console.error('Error fetching pending purchases:', err);
     }
   };
 
@@ -257,12 +273,12 @@ export default function ProfilePanel({ isOpen, onClose }) {
                 </div>
               </div>
 
-              {/* Section: Pending Pickups / QR Codes */}
-              {acceptedRequests.length > 0 && (
+              {/* Section: My Purchases (Buyer) */}
+              {pendingPurchases.length > 0 && (
                 <div className="panel-section">
-                  <h4 className="section-title">Pending Pickups</h4>
+                  <h4 className="section-title">My Purchases</h4>
                   <div className="active-events-list">
-                    {acceptedRequests.map(req => (
+                    {pendingPurchases.map(req => (
                       <div 
                         key={req.id} 
                         className="user-event-card" 
@@ -274,15 +290,40 @@ export default function ProfilePanel({ isOpen, onClose }) {
                             {req.product_name}
                             <TbQrcode size={18} style={{ color: 'var(--teal-300)' }} />
                           </h5>
-                          <span style={{ fontSize: '11px', color: 'var(--teal-300)', display: 'block' }}>Buyer: {req.buyer_name}</span>
+                          <span style={{ fontSize: '11px', color: 'var(--teal-300)', display: 'block' }}>Seller: {req.seller_name}</span>
                           <span style={{ fontSize: '11px', display: 'block', marginTop: 2 }}>Date: {req.pickup_date || 'TBD'}</span>
                         </div>
                         {selectedQR === req.id && (
                           <div style={{ marginTop: 12, padding: 12, background: 'white', borderRadius: 8, alignSelf: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
                             <QRCode value={`REQ-${req.id}-${req.buyer_id}`} size={120} />
-                            <p style={{ textAlign: 'center', color: '#000', fontSize: 10, marginTop: 6, marginBottom: 0, fontWeight: 600 }}>Show to Buyer to Scan</p>
+                            <p style={{ textAlign: 'center', color: '#000', fontSize: 10, marginTop: 6, marginBottom: 0, fontWeight: 600 }}>Show to Seller to Scan</p>
                           </div>
                         )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Section: Pending Pickups (Seller) */}
+              {acceptedRequests.length > 0 && (
+                <div className="panel-section">
+                  <h4 className="section-title">Pending Pickups</h4>
+                  <div className="active-events-list">
+                    {acceptedRequests.map(req => (
+                      <div 
+                        key={req.id} 
+                        className="user-event-card" 
+                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
+                      >
+                        <div className="user-event-card__info" style={{ width: '100%' }}>
+                          <h5 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 4px 0' }}>
+                            {req.product_name}
+                            <TbQrcode size={18} style={{ opacity: 0.4 }} />
+                          </h5>
+                          <span style={{ fontSize: '11px', color: 'var(--teal-300)', display: 'block' }}>Buyer: {req.buyer_name}</span>
+                          <span style={{ fontSize: '11px', display: 'block', marginTop: 2 }}>Status: Awaiting Scan</span>
+                        </div>
                       </div>
                     ))}
                   </div>
