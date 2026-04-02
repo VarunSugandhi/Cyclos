@@ -96,7 +96,7 @@ export default function MainPage() {
     const fetchPendingBuyRequests = async () => {
       try {
         const { data } = await supabase
-          .from('buy_requests')
+          .from('market_orders')
           .select('*')
           .eq('seller_id', user.id)
           .eq('status', 'pending')
@@ -137,7 +137,7 @@ export default function MainPage() {
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
-        table: 'buy_requests',
+        table: 'market_orders',
         filter: `seller_id=eq.${user.id}`,
       }, (payload) => {
         const req = payload.new;
@@ -169,7 +169,7 @@ export default function MainPage() {
     if (notif.type === 'buy_request' && btn.label === 'Accept') {
       const realId = notif.id.replace('buy-', '');
       try {
-        await supabase.from('buy_requests').update({ status: 'accepted' }).eq('id', realId);
+        await supabase.from('market_orders').update({ status: 'accepted' }).eq('id', realId);
         // Remove from notifications
         setNotifications(prev => prev.filter(n => n.id !== notif.id));
         // Show profile panel so they can see QR
