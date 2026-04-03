@@ -1,4 +1,4 @@
-const NVIDIA_API_KEY = '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';
+const NVIDIA_API_KEY = 'ENTER_API-KEY_HERE';
 const BASE_URL = '/api/nvidia';
 
 /**
